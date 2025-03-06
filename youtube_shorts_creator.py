@@ -18,6 +18,11 @@ import multiprocessing
 from functools import partial
 import moviepy.config
 import time
+import requests
+from linkedin_api import Linkedin
+from instabot import Bot
+from TikTokApi import TikTokApi
+from googleapiclient.http import MediaFileUpload
 
 #! Configurar logging
 logging.basicConfig(level=logging.INFO)
@@ -25,6 +30,297 @@ logger = logging.getLogger(__name__)
 
 #! Cargar variables de entorno
 load_dotenv()
+
+class ContentOptimizer:
+    def __init__(self):
+        # Configurar OpenAI
+        openai.api_key = os.getenv('OPENAI_API_KEY')
+        if not openai.api_key:
+            raise ValueError("No se encontró la clave API de OpenAI")
+
+    def optimize_transcription_for_social(self, transcription):
+        """Genera una descripción corta optimizada a partir de la transcripción."""
+        try:
+            prompt = f"""Instrucciones:
+            1. Analiza esta transcripción de un video de 30 segundos sobre tecnología
+            2. Genera un título atractivo de MÁXIMO 40 caracteres
+            3. El título debe reflejar el tema técnico principal
+            4. Debe ser en español
+            5. Debe ser llamativo y profesional
+            6. NO uses hashtags ni emojis
+            7. Mantén términos técnicos en inglés cuando sea apropiado
+            8. Enfócate en conceptos de Data Science y programación
+
+            Transcripción del video:
+            {transcription}"""
+
+            response = openai.ChatCompletion.create(
+                model="gpt-3.5-turbo",
+                messages=[
+                    {"role": "system", "content": "Eres un experto en marketing de contenido técnico, especializado en transformar transcripciones en títulos atractivos para redes sociales."},
+                    {"role": "user", "content": prompt}
+                ],
+                temperature=0.7,
+                max_tokens=50
+            )
+
+            title = response.choices[0].message.content.strip()
+            
+            # Asegurar que no exceda 40 caracteres
+            if len(title) > 40:
+                last_space = title[:37].rfind(' ')
+                if last_space != -1:
+                    title = title[:last_space] + "..."
+                else:
+                    title = title[:37] + "..."
+
+            return title
+
+        except Exception as e:
+            logger.error(f"Error al optimizar transcripción: {str(e)}")
+            # En caso de error, extraer una parte relevante de la transcripción
+            words = transcription.split()[:6]  # Tomar las primeras 6 palabras
+            return " ".join(words)[:37] + "..." if len(" ".join(words)) > 40 else " ".join(words)
+
+class SocialMediaPublisher:
+    def __init__(self):
+        # Configurar APIs de redes sociales
+        self.youtube = build('youtube', 'v3', developerKey=os.getenv('YOUTUBE_API_KEY'))
+        self.linkedin = Linkedin(os.getenv('LINKEDIN_USERNAME'), os.getenv('LINKEDIN_PASSWORD'))
+        self.instagram = Bot()
+        self.tiktok = TikTokApi()
+        
+        # Inicializar sesiones
+        self.instagram.login(
+            username=os.getenv('INSTAGRAM_USERNAME'),
+            password=os.getenv('INSTAGRAM_PASSWORD')
+        )
+        
+        # Configurar OpenAI y ContentOptimizer
+        openai.api_key = os.getenv('OPENAI_API_KEY')
+        self.content_optimizer = ContentOptimizer()
+
+    def generate_short_description(self, full_description):
+        """Genera una descripción corta (40 caracteres) basada en la transcripción del video."""
+        try:
+            prompt = f"""Instrucciones:
+            1. Genera un título atractivo de MÁXIMO 40 caracteres basado en esta transcripción de 30 segundos
+            2. El título debe capturar la esencia del contenido técnico
+            3. Debe ser en español
+            4. Debe ser llamativo y generar interés
+            5. NO uses hashtags ni emojis
+            6. Mantén términos técnicos importantes de Data Science y programación
+            7. Debe ser directo y conciso
+            8. Si hay términos técnicos en inglés, mantenlos en inglés
+
+            Transcripción del segmento: {full_description}"""
+
+            response = openai.ChatCompletion.create(
+                model="gpt-3.5-turbo",
+                messages=[
+                    {"role": "system", "content": "Eres un experto en marketing digital especializado en contenido técnico de Data Science y programación. Tu objetivo es crear títulos concisos y atractivos que capturen la esencia técnica del contenido."},
+                    {"role": "user", "content": prompt}
+                ],
+                temperature=0.7,
+                max_tokens=50
+            )
+
+            short_description = response.choices[0].message.content.strip()
+            
+            # Asegurar que no exceda 40 caracteres
+            if len(short_description) > 40:
+                # Intentar cortar en un espacio para no cortar palabras
+                last_space = short_description[:37].rfind(' ')
+                if last_space != -1:
+                    short_description = short_description[:last_space] + "..."
+                else:
+                    short_description = short_description[:37] + "..."
+                
+            return short_description
+
+        except Exception as e:
+            logger.error(f"Error al generar descripción corta: {str(e)}")
+            # En caso de error, tomar las primeras palabras de la transcripción
+            words = full_description.split()
+            short_desc = ' '.join(words[:4])  # Tomar las primeras 4 palabras
+            return short_desc[:37] + "..." if len(short_desc) > 40 else short_desc
+
+    def generate_hashtags(self, description):
+        """Genera 4 hashtags relevantes basados en la descripción."""
+        try:
+            prompt = f"""Instrucciones:
+            1. Genera EXACTAMENTE 4 hashtags relevantes
+            2. Deben estar relacionados con: {description}
+            3. Enfócate en términos técnicos de Data Science y programación
+            4. Usa una mezcla de español e inglés
+            5. NO uses espacios en los hashtags
+            6. Formato: #hashtag1 #hashtag2 #hashtag3 #hashtag4
+
+            Descripción: {description}"""
+
+            response = openai.ChatCompletion.create(
+                model="gpt-3.5-turbo",
+                messages=[
+                    {"role": "system", "content": "Eres un experto en SEO y hashtags para contenido técnico de Data Science y programación."},
+                    {"role": "user", "content": prompt}
+                ],
+                temperature=0.7,
+                max_tokens=50
+            )
+
+            hashtags = response.choices[0].message.content.strip()
+            return hashtags
+
+        except Exception as e:
+            logger.error(f"Error al generar hashtags: {str(e)}")
+            return "#DataScience #Programming #Tech #Coding"
+
+    def publish_to_youtube(self, video_path, title, description):
+        """Publica un video en YouTube Shorts."""
+        try:
+            logger.info("Publicando en YouTube Shorts...")
+            
+            # Crear el body de la solicitud
+            request_body = {
+                'snippet': {
+                    'title': title,
+                    'description': description,
+                    'tags': [tag.strip('#') for tag in description.split() if tag.startswith('#')],
+                    'categoryId': '28'  # Categoría: Science & Technology
+                },
+                'status': {
+                    'privacyStatus': 'public',
+                    'selfDeclaredMadeForKids': False
+                }
+            }
+            
+            # Iniciar la carga del video
+            insert_request = self.youtube.videos().insert(
+                part=','.join(request_body.keys()),
+                body=request_body,
+                media_body=MediaFileUpload(video_path, chunksize=-1, resumable=True)
+            )
+            
+            # Ejecutar la carga
+            response = None
+            while response is None:
+                status, response = insert_request.next_chunk()
+                if status:
+                    logger.info(f"Subida en progreso: {int(status.progress() * 100)}%")
+            
+            logger.info(f"Video subido exitosamente a YouTube: https://youtu.be/{response['id']}")
+            return response['id']
+            
+        except Exception as e:
+            logger.error(f"Error al publicar en YouTube: {str(e)}")
+            raise
+
+    def publish_to_linkedin(self, video_path, description):
+        """Publica un video en LinkedIn."""
+        try:
+            logger.info("Publicando en LinkedIn...")
+            
+            # Subir el video
+            video_data = self.linkedin.upload_video(video_path)
+            
+            # Crear la publicación con el video
+            if video_data and 'video_urn' in video_data:
+                post_data = {
+                    'author': f"urn:li:person:{self.linkedin.get_user_profile()['id']}",
+                    'lifecycleState': 'PUBLISHED',
+                    'specificContent': {
+                        'com.linkedin.ugc.ShareContent': {
+                            'media': [{
+                                'status': 'READY',
+                                'media': video_data['video_urn']
+                            }],
+                            'shareCommentary': {
+                                'text': description
+                            },
+                            'shareMediaCategory': 'VIDEO'
+                        }
+                    },
+                    'visibility': {
+                        'com.linkedin.ugc.MemberNetworkVisibility': 'PUBLIC'
+                    }
+                }
+                
+                response = self.linkedin.make_post(post_data)
+                logger.info("Video publicado exitosamente en LinkedIn")
+                return response
+            
+        except Exception as e:
+            logger.error(f"Error al publicar en LinkedIn: {str(e)}")
+            raise
+
+    def publish_to_instagram(self, video_path, description):
+        """Publica un video en Instagram Reels."""
+        try:
+            logger.info("Publicando en Instagram Reels...")
+            
+            # Subir el video como Reel
+            if self.instagram.upload_video(
+                video_path,
+                caption=description,
+                is_reel=True
+            ):
+                logger.info("Video publicado exitosamente en Instagram Reels")
+                return True
+            else:
+                raise Exception("La publicación en Instagram falló")
+            
+        except Exception as e:
+            logger.error(f"Error al publicar en Instagram: {str(e)}")
+            raise
+
+    def publish_to_tiktok(self, video_path, description):
+        """Publica un video en TikTok."""
+        try:
+            logger.info("Publicando en TikTok...")
+            
+            # Autenticar con TikTok
+            with self.tiktok.create_sessions() as session:
+                # Subir el video
+                upload_response = session.video.upload(
+                    video_path,
+                    description=description,
+                    privacy_level='public'
+                )
+                
+                if upload_response and 'video_id' in upload_response:
+                    logger.info("Video publicado exitosamente en TikTok")
+                    return upload_response['video_id']
+                else:
+                    raise Exception("La publicación en TikTok falló")
+            
+        except Exception as e:
+            logger.error(f"Error al publicar en TikTok: {str(e)}")
+            raise
+
+    def publish_to_all_platforms(self, video_path, full_transcription):
+        """Publica el video en todas las plataformas."""
+        try:
+            # Generar título optimizado a partir de la transcripción
+            optimized_title = self.content_optimizer.optimize_transcription_for_social(full_transcription)
+            
+            # Generar hashtags basados en la transcripción
+            hashtags = self.generate_hashtags(full_transcription)
+            
+            # Combinar título y hashtags
+            final_description = f"{optimized_title}\n\n{hashtags}"
+            
+            # Publicar en cada plataforma
+            self.publish_to_youtube(video_path, optimized_title, final_description)
+            self.publish_to_linkedin(video_path, final_description)
+            self.publish_to_instagram(video_path, final_description)
+            self.publish_to_tiktok(video_path, final_description)
+            
+            logger.info(f"Video publicado exitosamente en todas las plataformas")
+            logger.info(f"Título optimizado: {optimized_title}")
+            logger.info(f"Hashtags: {hashtags}")
+            
+        except Exception as e:
+            logger.error(f"Error al publicar en redes sociales: {str(e)}")
 
 class YouTubeShortsCreator:
     def __init__(self, num_shorts=10, start_time_minutes=5):
@@ -51,13 +347,12 @@ class YouTubeShortsCreator:
             "gpt_input_tokens": 0,
             "gpt_output_tokens": 0
         }
-        # Nuevo: Rastreo detallado de consumos
         self.detailed_costs = {
             "whisper_transcriptions": [],
             "gpt_corrections": []
         }
-        self.usd_to_cop = 4000  # Tasa de cambio aproximada
-        self.max_workers = multiprocessing.cpu_count()  # Usar todos los núcleos disponibles
+        self.usd_to_cop = 4000
+        self.max_workers = multiprocessing.cpu_count()
         self.temp_quality = {
             'audio': {
                 'fps': 44100,
@@ -65,15 +360,16 @@ class YouTubeShortsCreator:
                 'codec': 'pcm_s16le'
             },
             'video': {
-                'fps': None,  # Mantener fps original
+                'fps': None,
                 'preset': 'medium',
                 'threads': self.max_workers,
-                'bitrate': None  # Mantener bitrate original
+                'bitrate': None
             }
         }
+        
+        # Inicializar el publicador de redes sociales
+        self.social_publisher = SocialMediaPublisher()
 
-    
-    
     def extract_video_id(self, url):
     #!    """Extrae el ID del video de la URL de YouTube."""
         pattern = r'(?:v=|\/)([0-9A-Za-z_-]{11})(?:&|\/|$)'
@@ -758,33 +1054,45 @@ class YouTubeShortsCreator:
                         
                         # Obtener transcripción y crear subtítulos
                         segments = self.get_audio_transcription(clip)
+                        
                         if segments:
+                            # Combinar todos los segmentos de texto transcritos para este clip
+                            full_transcription = " ".join([seg["text"] for seg in segments])
+                            
+                            # Crear subtítulos
                             subtitle_clips = self.create_subtitles(vertical_clip, segments)
                             if subtitle_clips:
                                 vertical_clip = CompositeVideoClip([vertical_clip] + subtitle_clips)
                         
-                        # Guardar el video en la carpeta audio_transcription
-                        timestamp = time.strftime("%Y%m%d_%H%M%S")
-                        output_path = f"{self.audio_dir}/short_{start_time}_{end_time}_{timestamp}.mp4"
-                        logger.info(f"Guardando video en {output_path}...")
-                        
-                        vertical_clip.write_videofile(
-                            output_path,
-                            codec='libx264',
-                            audio_codec='aac',
-                            preset=self.temp_quality['video']['preset'],
-                            threads=self.temp_quality['video']['threads'],
-                            ffmpeg_params=['-pix_fmt', 'yuv420p'],
-                            logger=None,
-                            verbose=False
-                        )
-                        
-                        created_shorts.append({
-                            "path": output_path,
-                            "description": segment["description"]
-                        })
-                        
-                        logger.info(f"Short creado exitosamente: {output_path}")
+                            # Guardar el video en la carpeta audio_transcription
+                            timestamp = time.strftime("%Y%m%d_%H%M%S")
+                            output_path = f"{self.audio_dir}/short_{start_time}_{end_time}_{timestamp}.mp4"
+                            logger.info(f"Guardando video en {output_path}...")
+                            
+                            vertical_clip.write_videofile(
+                                output_path,
+                                codec='libx264',
+                                audio_codec='aac',
+                                preset=self.temp_quality['video']['preset'],
+                                threads=self.temp_quality['video']['threads'],
+                                ffmpeg_params=['-pix_fmt', 'yuv420p'],
+                                logger=None,
+                                verbose=False
+                            )
+                            
+                            # Publicar en redes sociales usando la transcripción completa
+                            logger.info("Publicando en redes sociales...")
+                            self.social_publisher.publish_to_all_platforms(
+                                output_path,
+                                full_transcription  # Usar la transcripción en lugar de la descripción original
+                            )
+                            
+                            created_shorts.append({
+                                "path": output_path,
+                                "description": full_transcription  # Guardar la transcripción como descripción
+                            })
+                            
+                            logger.info(f"Short creado y publicado exitosamente: {output_path}")
                         
                     except Exception as e:
                         logger.error(f"Error al procesar segmento: {e}")
