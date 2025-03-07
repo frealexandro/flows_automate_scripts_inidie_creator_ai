@@ -1,73 +1,137 @@
-# Creador de YouTube Shorts con IA
+# 🎥 YouTube Shorts Creator & Social Media Publisher
 
-Este script permite crear shorts de YouTube automáticamente utilizando inteligencia artificial para identificar los momentos más interesantes de un video.
+Sistema automatizado para crear y publicar contenido en múltiples plataformas sociales a partir de videos largos.
 
-## Características
+## 📊 Diagrama de Flujo
 
-- Descarga videos de YouTube
-- Usa GPT-4 Vision para analizar el contenido
-- Identifica automáticamente los momentos más interesantes
-- Convierte al formato vertical de shorts (9:16)
-- Genera múltiples shorts de un solo video
-
-## Requisitos
-
-- Python 3.8 o superior
-- Clave de API de OpenAI
-- Clave de API de YouTube
-
-## Instalación
-
-1. Clonar el repositorio:
-```bash
-git clone [url-del-repositorio]
-cd [nombre-del-directorio]
+```mermaid
+graph TD
+    A[Video Original en Drive] -->|Descarga| B[Procesamiento de Video]
+    B -->|Extracción| C[Audio]
+    C -->|Whisper AI| D[Transcripción]
+    D -->|Análisis| E[Selección de Segmentos]
+    
+    B -->|Corte| F[Generación de Shorts]
+    D -->|Subtítulos| F
+    
+    F -->|Optimización| G[Metadata]
+    G -->|Títulos| H[Títulos Optimizados]
+    G -->|Hashtags| I[Hashtags Relevantes]
+    
+    F -->|Upload| J[Google Drive]
+    J -->|Verificación| K[Google Sheets]
+    
+    K -->|Aprobación| L[Publicación Multi-Plataforma]
+    L -->|YouTube| M[YouTube Shorts]
+    L -->|LinkedIn| N[LinkedIn Videos]
+    L -->|Instagram| O[Instagram Reels]
+    L -->|TikTok| P[TikTok Videos]
 ```
 
-2. Crear un entorno virtual:
-```bash
-python3 -m venv venv
-source venv/bin/activate  # En Windows: venv\Scripts\activate
+## 🌟 Características
+
+- ✂️ **Corte Inteligente**: Divide videos largos en shorts optimizados
+- 🎯 **Transcripción Automática**: Usando Whisper AI
+- 📝 **Generación de Subtítulos**: Integrados en el video
+- 🔍 **Optimización SEO**: Títulos y hashtags optimizados
+- 📊 **Gestión en Sheets**: Control y aprobación de contenido
+- 🚀 **Multi-Plataforma**: Publica en:
+  - YouTube Shorts
+  - LinkedIn
+  - Instagram Reels
+  - TikTok
+
+## 🛠️ Requisitos
+
+1. **Python 3.8+**
+2. **Credenciales**:
+   - Google Service Account (Drive, Sheets, YouTube)
+   - Instagram credentials
+   - LinkedIn API token
+   - TikTok session ID
+
+3. **Dependencias**:
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+## ⚙️ Configuración
+
+1. **Variables de Entorno** (.env):
+   ```env
+   OPENAI_API_KEY="tu_api_key"
+   YOUTUBE_API_KEY="tu_api_key"
+   INSTAGRAM_USERNAME="tu_usuario"
+   INSTAGRAM_PASSWORD="tu_contraseña"
+   LINKEDIN_ACCESS_TOKEN="tu_token"
+   ```
+
+2. **Google Service Account**:
+   - Coloca el archivo `river-surf-452722-t6-d6bacb04e3e9.json` en el directorio raíz
+
+3. **Google Sheet**:
+   - Crea una hoja con las columnas:
+     - Date
+     - Link
+     - Título sugerido
+     - Hashtags
+     - Original Text
+     - Approve
+     - Fecha de publicación
+
+## 🚀 Uso
+
+1. **Ejecutar el script**:
+   ```bash
+   python publish_shorts.py
+   ```
+
+2. **Flujo de trabajo**:
+   - Sube tu video largo a Google Drive
+   - El sistema procesa el video y genera shorts
+   - Revisa y aprueba en Google Sheets
+   - El sistema publica automáticamente los aprobados
+
+## 📁 Estructura de Directorios
+
+```
+automate_scripts/
+├── publish_shorts.py
+├── requirements.txt
+├── .env
+├── river-surf-452722-t6-d6bacb04e3e9.json
+├── audio_transcription/
+└── shorts_output/
 ```
 
-3. Instalar dependencias:
-```bash
-pip install -r requirements.txt
-```
+## 🔄 Proceso Automático
 
-4. Configurar las claves de API:
-Crear un archivo `.env` con el siguiente contenido:
-```
-OPENAI_API_KEY=tu_clave_de_openai
-YOUTUBE_API_KEY=tu_clave_de_youtube
-```
+1. **Procesamiento**:
+   - Descarga video de Drive
+   - Extrae audio
+   - Genera transcripción
+   - Crea shorts con subtítulos
 
-## Uso
+2. **Optimización**:
+   - Genera títulos atractivos
+   - Crea hashtags relevantes
+   - Optimiza metadata
 
-1. Activar el entorno virtual:
-```bash
-source venv/bin/activate  # En Windows: venv\Scripts\activate
-```
+3. **Publicación**:
+   - Verifica aprobaciones en Sheets
+   - Publica en plataformas configuradas
+   - Actualiza estado en Sheets
 
-2. Ejecutar el script:
-```bash
-python youtube_shorts_creator.py
-```
+## ⚠️ Notas Importantes
 
-3. Ingresar la URL del video de YouTube cuando se solicite.
+- Los directorios de trabajo se limpian automáticamente después de cada ejecución
+- Se requieren permisos adecuados en todas las APIs
+- Verifica los límites de tamaño y duración para cada plataforma
 
-4. Los shorts generados se guardarán en la carpeta `shorts_output/`
+## 📝 Logs
 
-## Cómo funciona
-
-1. El script descarga el video de YouTube
-2. Utiliza GPT-4 Vision para analizar el contenido y encontrar momentos interesantes
-3. Recorta los segmentos seleccionados
-4. Convierte cada segmento al formato vertical de shorts
-5. Guarda los shorts generados
-
-## Notas
-
-- La duración de los shorts generados está entre 15 y 60 segundos
-- El script mantiene la calidad original del video
-- Se recomienda usar videos con buena calidad de origen 
+El sistema mantiene un registro detallado de:
+- Descargas de videos
+- Procesamiento de contenido
+- Publicaciones exitosas/fallidas
+- Limpieza de directorios 
