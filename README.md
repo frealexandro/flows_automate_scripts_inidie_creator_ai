@@ -1,166 +1,47 @@
-# 🎥 YouTube Shorts Creator & Social Media Publisher
+# 🤖 Flujos de Automatización con AI Open Source
 
-Sistema automatizado para crear y publicar contenido en múltiples plataformas sociales a partir de videos largos.
+## 📝 Descripción
+Este repositorio contiene una colección de flujos de automatización implementados con Python y herramientas de AI de código abierto. El objetivo es proporcionar alternativas gratuitas y escalables a las plataformas no-code tradicionales.
 
-## 🔒 Seguridad Importante
+## 🎯 Propósito
+- Facilitar la automatización de operaciones manuales
+- Ofrecer soluciones sin límites de uso
+- Proporcionar alternativas gratuitas a herramientas como Zapier, n8n, Make, etc.
+- Evitar costos de suscripción insostenibles
+- Mejorar la escalabilidad de tus automatizaciones
 
-⚠️ **NUNCA subas las credenciales a GitHub o cualquier repositorio público** ⚠️
+## 💡 Ventajas
+- **Código Abierto**: Todo el código es transparente y modificable
+- **Sin Costos Recurrentes**: No hay suscripciones mensuales
+- **Escalable**: Puedes adaptar y mejorar los flujos según tus necesidades
+- **Documentación Clara**: Cada flujo incluye instrucciones paso a paso
+- **Infraestructura Ligera**: No requiere recursos costosos
 
-1. **Archivos Protegidos** (no subir a git):
-   - `river-surf-452722-t6-db7a5ddf280c.json` (cuenta de servicio)
-   - `.env` (variables de entorno)
-   - Cualquier archivo con credenciales
+## 🚀 Cómo Empezar
+1. Clona este repositorio
+2. Revisa la documentación del flujo que te interese
+3. Sigue las instrucciones paso a paso
+4. ¡Ejecuta tu automatización!
 
-2. **Verificación de Seguridad**:
-   ```bash
-   # Verifica que tus credenciales están en .gitignore
-   cat .gitignore | grep "river-surf-452722-t6-db7a5ddf280c.json"
-   
-   # Verifica que no estás rastreando el archivo
-   git status | grep "river-surf-452722-t6-db7a5ddf280c.json"
-   ```
+## 🤝 Ayuda y Soporte
+Se recomienda usar [Cursor](https://cursor.com/) o un chat de AI para entender mejor el código. Cada flujo está documentado de manera explícita para facilitar su comprensión.
 
-## 📊 Diagrama de Flujo
+## 🎯 Público Objetivo
+- Emprendedores
+- Startups
+- Creadores Indie
+- Desarrolladores
+- Cualquier persona que busque automatizar tareas sin costos recurrentes
 
-```mermaid
-graph TD
-    A[Video Original en Drive] -->|Descarga| B[Procesamiento de Video]
-    B -->|Extracción| C[Audio]
-    C -->|Whisper AI| D[Transcripción]
-    D -->|Análisis| E[Selección de Segmentos]
-    
-    B -->|Corte| F[Generación de Shorts]
-    D -->|Subtítulos| F
-    
-    F -->|Optimización| G[Metadata]
-    G -->|Títulos| H[Títulos Optimizados]
-    G -->|Hashtags| I[Hashtags Relevantes]
-    
-    F -->|Upload| J[Google Drive]
-    J -->|Verificación| K[Google Sheets]
-    
-    K -->|Aprobación| L[Publicación Multi-Plataforma]
-    L -->|YouTube| M[YouTube Shorts]
-    L -->|LinkedIn| N[LinkedIn Videos]
-    L -->|Instagram| O[Instagram Reels]
-    L -->|TikTok| P[TikTok Videos]
-```
+## 📢 Nota Importante
+Este proyecto nace como respuesta a la problemática común de las herramientas no-code:
+- Altos costos de suscripción
+- Limitaciones en escalabilidad
+- Dependencia de infraestructura externa
+- Restricciones en personalización
 
-## 🌟 Características
+## 🤝 Contribuciones
+¡Las contribuciones son bienvenidas! Si tienes un flujo de automatización que quieras compartir, no dudes en crear un pull request.
 
-- ✂️ **Corte Inteligente**: Divide videos largos en shorts optimizados
-- 🎯 **Transcripción Automática**: Usando Whisper AI
-- 📝 **Generación de Subtítulos**: Integrados en el video
-- 🔍 **Optimización SEO**: Títulos y hashtags optimizados
-- 📊 **Gestión en Sheets**: Control y aprobación de contenido
-- 🚀 **Multi-Plataforma**: Publica en:
-  - YouTube Shorts
-  - LinkedIn
-  - Instagram Reels
-  - TikTok
-
-## 🛠️ Requisitos
-
-1. **Python 3.8+**
-2. **Credenciales**:
-   - Google Service Account (Drive, Sheets, YouTube)
-   - Instagram credentials
-   - LinkedIn API token
-   - TikTok session ID
-
-3. **Dependencias**:
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-## ⚙️ Configuración
-
-1. **Cuenta de Servicio**:
-   - Guarda `river-surf-452722-t6-db7a5ddf280c.json` en el directorio raíz
-   - ⚠️ Asegúrate de que este archivo está en `.gitignore`
-   - NUNCA compartas o subas este archivo
-
-2. **Variables de Entorno**:
-   - Crea un archivo `.env` basado en `.env.example`
-   - ⚠️ No subas el archivo `.env` a git
-   ```env
-   OPENAI_API_KEY="tu_api_key"
-   YOUTUBE_API_KEY="tu_api_key"
-   INSTAGRAM_USERNAME="tu_usuario"
-   INSTAGRAM_PASSWORD="tu_contraseña"
-   LINKEDIN_ACCESS_TOKEN="tu_token"
-   ```
-
-## 🚀 Uso
-
-1. **Ejecutar el script**:
-   ```bash
-   python publish_shorts.py
-   ```
-
-2. **Flujo de trabajo**:
-   - Sube tu video largo a Google Drive
-   - El sistema procesa el video y genera shorts
-   - Revisa y aprueba en Google Sheets
-   - El sistema publica automáticamente los aprobados
-
-## 📁 Estructura de Directorios
-
-```
-automate_scripts/
-├── publish_shorts.py
-├── requirements.txt
-├── .env
-├── river-surf-452722-t6-db7a5ddf280c.json
-├── audio_transcription/
-└── shorts_output/
-```
-
-## 🔄 Proceso Automático
-
-1. **Procesamiento**:
-   - Descarga video de Drive
-   - Extrae audio
-   - Genera transcripción
-   - Crea shorts con subtítulos
-
-2. **Optimización**:
-   - Genera títulos atractivos
-   - Crea hashtags relevantes
-   - Optimiza metadata
-
-3. **Publicación**:
-   - Verifica aprobaciones en Sheets
-   - Publica en plataformas configuradas
-   - Actualiza estado en Sheets
-
-## ⚠️ Notas Importantes
-
-- Los directorios de trabajo se limpian automáticamente después de cada ejecución
-- Se requieren permisos adecuados en todas las APIs
-- Verifica los límites de tamaño y duración para cada plataforma
-
-## 📝 Logs
-
-El sistema mantiene un registro detallado de:
-- Descargas de videos
-- Procesamiento de contenido
-- Publicaciones exitosas/fallidas
-- Limpieza de directorios 
-
-## 🛡️ Mejores Prácticas de Seguridad
-
-1. **Protección de Credenciales**:
-   - Mantén las credenciales fuera de git
-   - Usa `.gitignore` para excluir archivos sensibles
-   - Verifica regularmente que no hay credenciales expuestas
-
-2. **Manejo de Archivos Sensibles**:
-   - Guarda las credenciales localmente
-   - No las compartas por correo o mensajería
-   - Usa gestores de secretos cuando sea posible
-
-3. **Rotación de Credenciales**:
-   - Cambia las credenciales periódicamente
-   - Revoca inmediatamente credenciales comprometidas
-   - Mantén un registro de accesos 
+## 📝 Licencia
+Este proyecto es de código abierto y está disponible bajo la licencia MIT.
