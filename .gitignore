@@ -35,3 +35,5 @@ ENV/
 # Archivos de sistema
 .DS_Store
 .env
+.env.example
+.json
