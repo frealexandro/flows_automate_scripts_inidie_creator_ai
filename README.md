@@ -2,6 +2,24 @@
 
 Sistema automatizado para crear y publicar contenido en múltiples plataformas sociales a partir de videos largos.
 
+## 🔒 Seguridad Importante
+
+⚠️ **NUNCA subas las credenciales a GitHub o cualquier repositorio público** ⚠️
+
+1. **Archivos Protegidos** (no subir a git):
+   - `river-surf-452722-t6-db7a5ddf280c.json` (cuenta de servicio)
+   - `.env` (variables de entorno)
+   - Cualquier archivo con credenciales
+
+2. **Verificación de Seguridad**:
+   ```bash
+   # Verifica que tus credenciales están en .gitignore
+   cat .gitignore | grep "river-surf-452722-t6-db7a5ddf280c.json"
+   
+   # Verifica que no estás rastreando el archivo
+   git status | grep "river-surf-452722-t6-db7a5ddf280c.json"
+   ```
+
 ## 📊 Diagrama de Flujo
 
 ```mermaid
@@ -57,7 +75,14 @@ graph TD
 
 ## ⚙️ Configuración
 
-1. **Variables de Entorno** (.env):
+1. **Cuenta de Servicio**:
+   - Guarda `river-surf-452722-t6-db7a5ddf280c.json` en el directorio raíz
+   - ⚠️ Asegúrate de que este archivo está en `.gitignore`
+   - NUNCA compartas o subas este archivo
+
+2. **Variables de Entorno**:
+   - Crea un archivo `.env` basado en `.env.example`
+   - ⚠️ No subas el archivo `.env` a git
    ```env
    OPENAI_API_KEY="tu_api_key"
    YOUTUBE_API_KEY="tu_api_key"
@@ -65,19 +90,6 @@ graph TD
    INSTAGRAM_PASSWORD="tu_contraseña"
    LINKEDIN_ACCESS_TOKEN="tu_token"
    ```
-
-2. **Google Service Account**:
-   - Coloca el archivo `river-surf-452722-t6-d6bacb04e3e9.json` en el directorio raíz
-
-3. **Google Sheet**:
-   - Crea una hoja con las columnas:
-     - Date
-     - Link
-     - Título sugerido
-     - Hashtags
-     - Original Text
-     - Approve
-     - Fecha de publicación
 
 ## 🚀 Uso
 
@@ -99,7 +111,7 @@ automate_scripts/
 ├── publish_shorts.py
 ├── requirements.txt
 ├── .env
-├── river-surf-452722-t6-d6bacb04e3e9.json
+├── river-surf-452722-t6-db7a5ddf280c.json
 ├── audio_transcription/
 └── shorts_output/
 ```
@@ -135,3 +147,20 @@ El sistema mantiene un registro detallado de:
 - Procesamiento de contenido
 - Publicaciones exitosas/fallidas
 - Limpieza de directorios 
+
+## 🛡️ Mejores Prácticas de Seguridad
+
+1. **Protección de Credenciales**:
+   - Mantén las credenciales fuera de git
+   - Usa `.gitignore` para excluir archivos sensibles
+   - Verifica regularmente que no hay credenciales expuestas
+
+2. **Manejo de Archivos Sensibles**:
+   - Guarda las credenciales localmente
+   - No las compartas por correo o mensajería
+   - Usa gestores de secretos cuando sea posible
+
+3. **Rotación de Credenciales**:
+   - Cambia las credenciales periódicamente
+   - Revoca inmediatamente credenciales comprometidas
+   - Mantén un registro de accesos 
