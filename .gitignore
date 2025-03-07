@@ -1,11 +1,17 @@
+# Credenciales y archivos sensibles
+river-surf-452722-t6-db7a5ddf280c.json
+*credentials*.json
+service-account*.json
+
 # Archivos temporales
 temp/
 shorts_output/
+audio_transcription/
+temp_videos/
 *.mp4
 *.wav
 *.mp3
 
-/venv
 # Python
 __pycache__/
 *.py[cod]
@@ -32,8 +38,13 @@ var/
 venv/
 ENV/
 
-# Archivos de sistema
+# Archivos de sistema y configuración
 .DS_Store
 .env
 .env.example
-.json
+.env.*
+
+# Permitir
+!requirements.txt
+!package.json
+!package-lock.json
