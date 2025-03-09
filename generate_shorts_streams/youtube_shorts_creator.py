@@ -718,7 +718,7 @@ class YouTubeShortsCreator:
            - Machine Learning, Deep Learning, AI
            - Lenguajes: Python, SQL, R, Java, JavaScript
            - Frameworks: TensorFlow, PyTorch, Pandas, NumPy
-           - Cloud: AWS, Azure, GCP
+           - Cloud: AWS, Azure, GCP , nube
            - Big Data: Hadoop, Spark, Kafka
         3. NO agregues ni quites información
         4. NO agregues prefijos o texto adicional
