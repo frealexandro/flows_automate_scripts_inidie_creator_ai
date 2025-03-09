@@ -1,16 +1,12 @@
 import os
 import yt_dlp
 from moviepy.editor import VideoFileClip, concatenate_videoclips, CompositeVideoClip, vfx, ColorClip, TextClip
-import openai
+from openai import OpenAI
 from dotenv import load_dotenv
 import json
 from googleapiclient.discovery import build
 import logging
 import re
-import librosa
-import numpy as np
-import soundfile as sf
-import whisper
 from pydub import AudioSegment
 import tempfile
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -21,6 +17,7 @@ import time
 from googleapiclient.http import MediaFileUpload
 from google.oauth2 import service_account
 from datetime import datetime
+import random
 
 #! Configurar logging
 logging.basicConfig(level=logging.INFO)
@@ -30,11 +27,14 @@ logger = logging.getLogger(__name__)
 load_dotenv()
 
 class ContentOptimizer:
-    def __init__(self):
-        # Configurar OpenAI
-        openai.api_key = os.getenv('OPENAI_API_KEY')
-        if not openai.api_key:
-            raise ValueError("No se encontró la clave API de OpenAI")
+    def __init__(self, openai_client=None):
+        if openai_client is None:
+            api_key = os.getenv('OPENAI_API_KEY')
+            if not api_key:
+                raise ValueError("No se encontró la clave API de OpenAI")
+            self.client = OpenAI(api_key=api_key)
+        else:
+            self.client = openai_client
 
     def optimize_transcription_for_social(self, transcription):
         """Genera una descripción corta optimizada a partir de la transcripción."""
@@ -54,7 +54,7 @@ class ContentOptimizer:
             Transcripción del video:
             {transcription}"""
 
-            response = openai.ChatCompletion.create(
+            response = self.client.chat.completions.create(
                 model="gpt-3.5-turbo",
                 messages=[
                     {"role": "system", "content": "Eres un experto en marketing de contenido técnico, especializado en transformar transcripciones en títulos atractivos para redes sociales. Devuelve SOLO el título, sin ningún texto adicional."},
@@ -106,7 +106,7 @@ class ContentOptimizer:
 
             Descripción: {description}"""
 
-            response = openai.ChatCompletion.create(
+            response = self.client.chat.completions.create(
                 model="gpt-3.5-turbo",
                 messages=[
                     {"role": "system", "content": "Eres un experto en SEO y hashtags para contenido técnico de Data Science y programación. Genera hashtags cortos y concisos."},
@@ -148,7 +148,7 @@ class DriveUploader:
         try:
             # Cargar credenciales de la cuenta de servicio
             self.credentials = service_account.Credentials.from_service_account_file(
-                'river-surf-452722-t6-d6bacb04e3e9.json',
+                'river-surf-452722-t6-24c6cdaf896b.json',
                 scopes=[
                     'https://www.googleapis.com/auth/drive',
                     'https://www.googleapis.com/auth/spreadsheets',
@@ -166,44 +166,64 @@ class DriveUploader:
             logger.error(f"Error al inicializar servicios de Google: {str(e)}")
             raise
 
-    def upload_video_to_drive(self, video_path):
+    def upload_video_to_drive(self, video_path, max_retries=3):
         """Sube el video a Google Drive usando la cuenta de servicio."""
-        try:
-            file_metadata = {
-                'name': os.path.basename(video_path),
-                'parents': [self.DRIVE_FOLDER_ID],
-                'mimeType': 'video/mp4'
-            }
-            
-            media = MediaFileUpload(
-                video_path, 
-                mimetype='video/mp4',
-                resumable=True
-            )
-            
-            file = self.drive_service.files().create(
-                body=file_metadata,
-                media_body=media,
-                fields='id, webViewLink',
-                supportsAllDrives=True
-            ).execute()
-            
-            # Configurar permisos para que cualquiera con el enlace pueda ver
-            self.drive_service.permissions().create(
-                fileId=file.get('id'),
-                body={
-                    'type': 'anyone',
-                    'role': 'reader'
-                },
-                supportsAllDrives=True
-            ).execute()
-            
-            logger.info(f"Video subido exitosamente a Drive: {file.get('webViewLink')}")
-            return file.get('webViewLink')
-            
-        except Exception as e:
-            logger.error(f"Error al subir video a Drive: {str(e)}")
-            raise
+        retry_count = 0
+        while retry_count < max_retries:
+            try:
+                file_metadata = {
+                    'name': os.path.basename(video_path),
+                    'parents': [self.DRIVE_FOLDER_ID],
+                    'mimeType': 'video/mp4'
+                }
+                
+                media = MediaFileUpload(
+                    video_path, 
+                    mimetype='video/mp4',
+                    resumable=True
+                )
+                
+                file = self.drive_service.files().create(
+                    body=file_metadata,
+                    media_body=media,
+                    fields='id, webViewLink',
+                    supportsAllDrives=True
+                ).execute()
+                
+                # Configurar permisos para que cualquiera con el enlace pueda ver
+                try:
+                    self.drive_service.permissions().create(
+                        fileId=file.get('id'),
+                        body={
+                            'type': 'anyone',
+                            'role': 'reader'
+                        },
+                        supportsAllDrives=True
+                    ).execute()
+                except Exception as perm_error:
+                    # Si falla al configurar permisos, intentar de nuevo
+                    time.sleep(2)  # Esperar 2 segundos antes de reintentar
+                    self.drive_service.permissions().create(
+                        fileId=file.get('id'),
+                        body={
+                            'type': 'anyone',
+                            'role': 'reader'
+                        },
+                        supportsAllDrives=True
+                    ).execute()
+                
+                logger.info(f"Video subido exitosamente a Drive: {file.get('webViewLink')}")
+                return file.get('webViewLink')
+                
+            except Exception as e:
+                retry_count += 1
+                if retry_count < max_retries:
+                    wait_time = 2 ** retry_count  # Espera exponencial
+                    logger.warning(f"Intento {retry_count} fallido. Esperando {wait_time} segundos antes de reintentar...")
+                    time.sleep(wait_time)
+                else:
+                    logger.error(f"Error al subir video a Drive después de {max_retries} intentos: {str(e)}")
+                    raise
 
     def update_metadata_sheet(self, video_link, optimized_title, hashtags, transcription):
         """Actualiza el Google Sheet usando la cuenta de servicio."""
@@ -262,10 +282,11 @@ class DriveUploader:
 
 class YouTubeShortsCreator:
     def __init__(self, num_shorts=10, start_time_minutes=5):
-        #! Configurar OpenAI
-        openai.api_key = os.getenv('OPENAI_API_KEY')
-        if not openai.api_key:
+        # Configurar OpenAI
+        api_key = os.getenv('OPENAI_API_KEY')
+        if not api_key:
             raise ValueError("No se encontró la clave API de OpenAI")
+        self.client = OpenAI(api_key=api_key)
         
         # Configuración de directorios
         self.output_dir = 'shorts_output'
@@ -280,8 +301,8 @@ class YouTubeShortsCreator:
         self.num_shorts = num_shorts  # Número de shorts a generar
         self.start_time_seconds = start_time_minutes * 60  # Convertir minutos a segundos
         
-        # Configuración de costos
-        self.whisper_cost_per_minute = 0.006
+        # Configuración de costos de API
+        self.whisper_cost_per_minute = 0.006  # Costo de Whisper API por minuto
         self.gpt35_input_cost_per_1k = 0.0005
         self.gpt35_output_cost_per_1k = 0.0015
         self.estimated_tokens_per_segment = 500
@@ -298,13 +319,11 @@ class YouTubeShortsCreator:
             "gpt_corrections": []
         }
         
-        # Configuración de calidad
+        # Configuración de calidad de audio/video
         self.max_workers = multiprocessing.cpu_count()
         self.temp_quality = {
             'audio': {
-                'fps': 44100,
-                'nbytes': 2,
-                'codec': 'pcm_s16le'
+                'codec': 'mp3'  # Formato para Whisper API
             },
             'video': {
                 'fps': None,
@@ -316,7 +335,7 @@ class YouTubeShortsCreator:
         
         # Inicializar servicios
         self.drive_uploader = DriveUploader()
-        self.content_optimizer = ContentOptimizer()
+        self.content_optimizer = ContentOptimizer(openai_client=self.client)
 
     def extract_video_id(self, url):
     #!    """Extrae el ID del video de la URL de YouTube."""
@@ -388,11 +407,10 @@ class YouTubeShortsCreator:
     
     
     def analyze_video_content(self, video_info):
-        #!""Analiza el contenido del video usando Whisper y GPT-3.5 para identificar momentos interesantes."""
+        """Extrae segmentos aleatorios del video para crear shorts."""
         video = None
-        analysis_clip = None
         try:
-            logger.info("Analizando el contenido del video con Whisper...")
+            logger.info("Analizando el contenido del video...")
             logger.info(f"Intentando abrir el archivo: {video_info['path']}")
             
             # Verificar que el archivo existe
@@ -405,93 +423,55 @@ class YouTubeShortsCreator:
             
             # Extraer el segmento de video que nos interesa analizar
             start_after = self.start_time_seconds
-            available_duration = video.duration - start_after
+            available_duration = video.duration - start_after - self.max_duration
             
             # Verificar si hay suficiente duración
             if available_duration < self.max_duration:
                 logger.warning(f"El video no tiene suficiente duración después del minuto {self.start_time_seconds//60}")
                 return []
             
-            logger.info(f"Extrayendo segmento de video desde el segundo {start_after}...")
-            # Extraer el segmento de video que queremos analizar
-            analysis_clip = video.subclip(start_after, video.duration)
+            logger.info(f"Extrayendo segmentos desde el segundo {start_after}...")
             
-            # Cargar el modelo de Whisper si no está cargado
-            if not hasattr(self, 'whisper_model'):
-                logger.info("Cargando modelo de Whisper...")
-                self.whisper_model = whisper.load_model("base")
+            # Calcular cuántos segmentos podemos extraer
+            max_possible_segments = int(available_duration // self.max_duration)
             
-            # Crear un archivo temporal para el audio
-            with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as temp_audio:
-                temp_audio_path = temp_audio.name
-                logger.info("Extrayendo audio a archivo temporal...")
-                analysis_clip.audio.write_audiofile(
-                    temp_audio_path,
-                    fps=16000,
-                    nbytes=2,
-                    codec='pcm_s16le',
-                    ffmpeg_params=['-ac', '1']  # Forzar mono
-                )
-                
-                # Cargar el audio con librosa
-                logger.info("Cargando audio para transcripción...")
-                audio_array, sr = librosa.load(temp_audio_path, sr=16000, mono=True)
-                
-                # Asegurarse de que el audio esté en el formato correcto
-                audio_array = audio_array.astype(np.float32)
-                audio_array = audio_array / np.max(np.abs(audio_array))
-                
-                logger.info("Transcribiendo audio con Whisper...")
-                result = self.whisper_model.transcribe(audio_array, language="es")
-                segments = result.get("segments", [])
-                logger.info(f"Transcripción completada. Se encontraron {len(segments)} segmentos.")
-                
-                # Limpiar archivo temporal
-                os.unlink(temp_audio_path)
-                
-                if not segments:
-                    logger.warning("No se encontraron segmentos de audio para transcribir")
-                    return []
-                
-                # Procesar los segmentos y encontrar momentos interesantes
-                all_moments = []
-                for segment in segments:
-                    if segment["end"] - segment["start"] >= 3:
-                        all_moments.append({
-                            "start_time": start_after + segment["start"],
-                            "description": segment["text"]
-                        })
-                
-                # Ordenar por tiempo de inicio
-                all_moments.sort(key=lambda x: x["start_time"])
-                
-                # Seleccionar momentos diferentes asegurando que estén separados por al menos max_duration
-                selected_moments = []
-                last_time = -float('inf')
-                
-                for moment in all_moments:
-                    if moment["start_time"] - last_time >= self.max_duration:
-                        selected_moments.append(moment)
-                        last_time = moment["start_time"]
-                        if len(selected_moments) >= self.num_shorts:
-                            break
-                
-                if selected_moments:
-                    logger.info(f"Análisis completado. Se identificaron {len(selected_moments)} momentos interesantes.")
-                    return selected_moments[:self.num_shorts]
-                
-                return []
+            if max_possible_segments < self.num_shorts:
+                logger.warning(f"Solo se pueden extraer {max_possible_segments} segmentos del video")
+                num_segments = max_possible_segments
+            else:
+                num_segments = self.num_shorts
+            
+            # Generar tiempos de inicio aleatorios
+            possible_start_times = []
+            current_time = start_after
+            
+            while current_time + self.max_duration <= video.duration:
+                possible_start_times.append(current_time)
+                current_time += self.max_duration
+            
+            # Seleccionar tiempos de inicio aleatorios
+            selected_times = random.sample(possible_start_times, min(num_segments, len(possible_start_times)))
+            selected_times.sort()  # Ordenar cronológicamente
+            
+            # Crear los segmentos
+            segments = []
+            for start_time in selected_times:
+                segments.append({
+                    "start_time": start_time,
+                    "description": f"Segmento desde {start_time} hasta {start_time + self.max_duration}",
+                    "duration": self.max_duration
+                })
+            
+            if segments:
+                logger.info(f"Se han seleccionado {len(segments)} segmentos aleatorios.")
+                return segments
+            
+            return []
                 
         except Exception as e:
             logger.error(f"Error al analizar el contenido: {str(e)}")
             return []
         finally:
-            # Cerrar los recursos
-            if analysis_clip is not None:
-                try:
-                    analysis_clip.close()
-                except:
-                    pass
             if video is not None:
                 try:
                     video.close()
@@ -608,7 +588,7 @@ class YouTubeShortsCreator:
         cost_usd = minutes_used * self.whisper_cost_per_minute
         cost_cop = cost_usd * self.usd_to_cop
         
-        # Nuevo: Guardar detalles de esta transcripción
+        # Guardar detalles de esta transcripción
         self.detailed_costs["whisper_transcriptions"].append({
             "duration_minutes": minutes_used,
             "cost_usd": cost_usd,
@@ -616,10 +596,6 @@ class YouTubeShortsCreator:
             "timestamp": time.strftime("%Y-%m-%d %H:%M:%S")
         })
         
-        logger.info("\nCosto real de Whisper para este segmento:")
-        logger.info(f"  Duración: {minutes_used:.2f} minutos")
-        logger.info(f"  USD: ${cost_usd:.4f}")
-        logger.info(f"  COP: ${cost_cop:,.2f}")
         return cost_usd
 
     def track_gpt_usage(self, response):
@@ -686,139 +662,201 @@ class YouTubeShortsCreator:
         }
 
     def correct_text_with_gpt(self, text):
-        #!"""Corrige errores ortográficos en el texto usando GPT-3.5."""
+        """Corrige errores ortográficos en el texto usando GPT-3.5."""
         try:
-            prompt = f"""Instrucciones:
-            1. Corrige errores ortográficos y de puntuación en español
-            2. MANTÉN sin modificar todos los términos técnicos como:
-               - Data Science, Data Engineering, Data Warehouse
-               - Delta Lake, Data Lake, Business Intelligence
-               - Machine Learning, Deep Learning, AI
-               - Lenguajes: Python, SQL, R, Java, JavaScript
-               - Frameworks: TensorFlow, PyTorch, Pandas, NumPy
-               - Cloud: AWS, Azure, GCP
-               - Big Data: Hadoop, Spark, Kafka
-            3. NO agregues ni quites información
-            4. NO agregues prefijos o texto adicional
-            5. Mantén el mismo tono y significado del texto original
-
-            Texto a corregir: {text}"""
-
-            response = openai.ChatCompletion.create(
-                model="gpt-3.5-turbo",
-                messages=[
-                    {"role": "system", "content": "Eres un corrector ortográfico experto en español especializado en contenido técnico de Data Science y programación."},
-                    {"role": "user", "content": prompt}
-                ],
-                temperature=0.3,
-                max_tokens=150
-            )
-
-            # Rastrear el uso de tokens
-            self.track_gpt_usage(response)
-
-            # Extraer y limpiar el texto corregido
-            corrected_text = response.choices[0].message.content.strip()
-            
-            # Eliminar cualquier prefijo común que GPT pueda agregar
-            prefixes_to_remove = ["Texto corregido:", "Texto:", "Corrección:", "Resultado:"]
-            for prefix in prefixes_to_remove:
-                if corrected_text.startswith(prefix):
-                    corrected_text = corrected_text.replace(prefix, "", 1).strip()
-
-            logger.info("Texto corregido con GPT-3.5")
-            return corrected_text
+            # Si el texto es muy largo, dividirlo en fragmentos
+            max_chars_per_chunk = 4000  # Aproximadamente 1000 tokens
+            if len(text) > max_chars_per_chunk:
+                # Dividir el texto en oraciones
+                sentences = text.replace('? ', '?|').replace('! ', '!|').replace('. ', '.|').split('|')
+                chunks = []
+                current_chunk = []
+                current_length = 0
+                
+                for sentence in sentences:
+                    sentence_length = len(sentence)
+                    if current_length + sentence_length > max_chars_per_chunk:
+                        # Guardar el chunk actual y empezar uno nuevo
+                        chunks.append(' '.join(current_chunk))
+                        current_chunk = [sentence]
+                        current_length = sentence_length
+                    else:
+                        current_chunk.append(sentence)
+                        current_length += sentence_length
+                
+                # Agregar el último chunk si existe
+                if current_chunk:
+                    chunks.append(' '.join(current_chunk))
+                
+                # Corregir cada chunk por separado
+                corrected_chunks = []
+                for chunk in chunks:
+                    try:
+                        corrected_chunk = self._correct_text_chunk(chunk)
+                        corrected_chunks.append(corrected_chunk)
+                    except Exception as e:
+                        logger.error(f"Error al corregir chunk: {str(e)}")
+                        corrected_chunks.append(chunk)  # Mantener el texto original si hay error
+                
+                # Unir los chunks corregidos
+                return ' '.join(corrected_chunks)
+            else:
+                # Si el texto es corto, corregirlo directamente
+                return self._correct_text_chunk(text)
 
         except Exception as e:
             logger.error(f"Error al corregir texto con GPT-3.5: {str(e)}")
             return text
 
+    def _correct_text_chunk(self, text):
+        """Corrige un fragmento de texto usando GPT-3.5."""
+        prompt = f"""Instrucciones:
+        1. Corrige errores ortográficos y de puntuación en español
+        2. MANTÉN sin modificar todos los términos técnicos como:
+           - Data Science, Data Engineering, Data Warehouse
+           - Delta Lake,Business Intelligence , Data Lakehouse , Databricks
+           - Machine Learning, Deep Learning, AI
+           - Lenguajes: Python, SQL, R, Java, JavaScript
+           - Frameworks: TensorFlow, PyTorch, Pandas, NumPy
+           - Cloud: AWS, Azure, GCP
+           - Big Data: Hadoop, Spark, Kafka
+        3. NO agregues ni quites información
+        4. NO agregues prefijos o texto adicional
+        5. Mantén el mismo tono y significado del texto original
+
+        Texto a corregir: {text}"""
+
+        response = self.client.chat.completions.create(
+            model="gpt-3.5-turbo",
+            messages=[
+                {"role": "system", "content": "Eres un corrector ortográfico experto en español especializado en contenido técnico de Data Science y programación."},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.3,
+            max_tokens=4000
+        )
+
+        # Rastrear el uso de tokens
+        self.track_gpt_usage(response)
+
+        # Extraer y limpiar el texto corregido
+        corrected_text = response.choices[0].message.content.strip()
+        
+        # Eliminar cualquier prefijo común que GPT pueda agregar
+        prefixes_to_remove = ["Texto corregido:", "Texto:", "Corrección:", "Resultado:"]
+        for prefix in prefixes_to_remove:
+            if corrected_text.startswith(prefix):
+                corrected_text = corrected_text.replace(prefix, "", 1).strip()
+
+        return corrected_text
+
     def get_audio_transcription(self, clip):
-        #!"""Transcribe el audio directamente desde el clip de video usando Whisper."""
-        temp_audio_path = None
+        """Transcribe el audio asegurando que coincida exactamente con el contenido del video."""
         try:
-            # Verificar que el clip tenga audio
             if not clip.audio:
                 logger.error("El clip no tiene audio")
                 return []
             
-            # Cargar el modelo de Whisper si no está cargado
-            if not hasattr(self, 'whisper_model'):
-                self.whisper_model = whisper.load_model("base")
+            temp_dir = os.path.join(self.temp_dir, 'audio_transcription')
+            os.makedirs(temp_dir, exist_ok=True)
             
-            # Crear archivo de audio en la carpeta audio_transcription
-            timestamp = time.strftime("%Y%m%d_%H%M%S")
-            audio_filename = f"audio_{timestamp}.wav"
-            temp_audio_path = os.path.join(self.audio_dir, audio_filename)
-            logger.info(f"Extrayendo audio a archivo: {temp_audio_path}")
-            
-            # Configurar moviepy para usar ffmpeg directamente
             try:
+                timestamp = time.strftime("%Y%m%d_%H%M%S")
+                audio_path = os.path.join(temp_dir, f"audio_{timestamp}.mp3")
+                
+                # Guardar el audio con alta calidad
                 clip.audio.write_audiofile(
-                    temp_audio_path,
-                    fps=16000,
-                    codec='pcm_s16le',
-                    ffmpeg_params=['-ac', '1'],  # Forzar mono
+                    audio_path,
+                    codec='mp3',
+                    bitrate='32k',
+                    fps=44100,
+                    ffmpeg_params=['-ac', '1'],
                     logger=None,
                     verbose=False
                 )
-            except Exception as e:
-                logger.error(f"Error al escribir el archivo de audio: {e}")
-                if os.path.exists(temp_audio_path):
-                    os.remove(temp_audio_path)
+                
+                def transcribe_with_size(audio_file, max_retries=3):
+                    """Intenta transcribir el audio, si falla lo divide en partes más pequeñas."""
+                    if max_retries <= 0:
+                        return []
+                    
+                    try:
+                        with open(audio_file, 'rb') if isinstance(audio_file, str) else audio_file as f:
+                            response = self.client.audio.transcriptions.create(
+                                model="whisper-1",
+                                file=f,
+                                language="es",
+                                response_format="json"  # Cambiado a json simple
+                            )
+                        
+                        # Solo registrar el costo una vez que la transcripción es exitosa
+                        self.track_whisper_usage(clip.duration)
+                        
+                        # Procesar la respuesta en formato json simple
+                        if hasattr(response, 'text') and response.text.strip():
+                            corrected_text = self.correct_text_with_gpt(response.text)
+                            return [{
+                                "text": corrected_text,
+                                "start": 0,
+                                "end": clip.duration,
+                                "words": []
+                            }]
+                        return []
+                        
+                    except Exception as e:
+                        logger.error(f"Error en transcripción: {str(e)}")
+                        if max_retries > 1:
+                            # Dividir el audio en dos partes
+                            audio = AudioSegment.from_file(audio_file if isinstance(audio_file, str) else audio_file.name)
+                            mid_point = len(audio) // 2
+                            
+                            # Guardar primera mitad
+                            first_half = audio[:mid_point]
+                            first_half_path = f"{audio_path}_part1.mp3"
+                            first_half.export(first_half_path, format="mp3")
+                            
+                            # Guardar segunda mitad
+                            second_half = audio[mid_point:]
+                            second_half_path = f"{audio_path}_part2.mp3"
+                            second_half.export(second_half_path, format="mp3")
+                            
+                            # Transcribir cada mitad recursivamente
+                            first_transcription = transcribe_with_size(first_half_path, max_retries - 1)
+                            second_transcription = transcribe_with_size(second_half_path, max_retries - 1)
+                            
+                            # Limpiar archivos temporales
+                            try:
+                                os.remove(first_half_path)
+                                os.remove(second_half_path)
+                            except:
+                                pass
+                            
+                            # Combinar resultados
+                            return first_transcription + second_transcription
+                        return []
+                
+                # Intentar transcribir el archivo completo
+                transcriptions = transcribe_with_size(audio_path)
+                if transcriptions:
+                    return transcriptions
+                
                 return []
-            
-            # Verificar que el archivo se creó correctamente
-            if not os.path.exists(temp_audio_path) or os.path.getsize(temp_audio_path) == 0:
-                logger.error("El archivo de audio no se creó correctamente")
-                return []
-            
-            # Cargar el audio con librosa
-            try:
-                audio_array, sr = librosa.load(temp_audio_path, sr=16000, mono=True)
-            except Exception as e:
-                logger.error(f"Error al cargar el audio con librosa: {e}")
-                return []
-            
-            # Normalizar el audio
-            audio_array = audio_array.astype(np.float32)
-            if np.max(np.abs(audio_array)) > 0:
-                audio_array = audio_array / np.max(np.abs(audio_array))
-            
-            # Transcribir con Whisper
-            result = self.whisper_model.transcribe(audio_array, language="es")
-            
-            # Rastrear uso de Whisper
-            self.track_whisper_usage(clip.duration)
-            
-            segments = result.get("segments", [])
-            logger.info(f"Se encontraron {len(segments)} segmentos en la transcripción")
-            
-            # Corregir cada segmento con GPT-3.5
-            corrected_segments = []
-            for segment in segments:
+                
+            finally:
+                # Limpiar archivos temporales
+                if os.path.exists(audio_path):
+                    try:
+                        os.remove(audio_path)
+                    except:
+                        pass
                 try:
-                    corrected_text = self.correct_text_with_gpt(segment["text"])
-                    segment["text"] = corrected_text
-                    segment["start"] = float(segment["start"])
-                    segment["end"] = float(segment["end"])
-                    corrected_segments.append(segment)
-                except Exception as e:
-                    logger.error(f"Error al corregir segmento: {e}")
-                    continue
-            
-            return corrected_segments
+                    os.rmdir(temp_dir)
+                except:
+                    pass
             
         except Exception as e:
             logger.error(f"Error general en la transcripción: {str(e)}")
             return []
-        finally:
-            # Limpiar archivo temporal si existe
-            if temp_audio_path and os.path.exists(temp_audio_path):
-                try:
-                    os.remove(temp_audio_path)
-                except Exception as e:
-                    logger.error(f"Error al eliminar archivo temporal: {e}")
 
     def create_subtitles(self, clip, segments):
         #!"""Crea subtítulos sincronizados con el habla con efectos llamativos."""
@@ -1179,7 +1217,7 @@ def main():
         return
 
     #all: Configuración personalizable
-    num_shorts = 15  # Número de shorts que quieres generar
+    num_shorts = 1  # Número de shorts que quieres generar
     start_time_minutes = 10  # Minuto desde donde empezar a analizar el video
     
     # Crear instancia del creador de shorts
